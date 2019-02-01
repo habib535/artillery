@@ -1,0 +1,48 @@
+config:
+  target: "http://localhost:8080"
+  phases:
+    - duration: 10
+      arrivalRate: 100
+  processor: "./playground.js"
+  defaults:
+    headers:
+      Accept: "text/html"
+scenarios:
+  - flow:
+      - get:
+          url: "/index"
+          afterResponse: "setPalindromRemoteUri"
+      - get:
+          url: "{{ remoteUri }}"
+          headers:
+            Accept: "application/json"
+          afterResponse: "setInsertItemPatch"
+      - patch:
+          url: "{{ remoteUri }}"
+          json: "{{ patchData }}"
+          headers:
+            Content-Type: "application/json-patch+json"
+            Accept: "application/json-patch+json"
+            X-Referer: "{{ remoteUri }}"
+          afterResponse: "setEditItemUri"
+      - get:
+          url: "{{ newUri }}"
+          headers:
+            Accept: "application/json-patch+json"
+            X-Referer: "{{ remoteUri }}"
+          afterResponse: "setEditItemPatch"
+      - patch:
+          url: "{{ remoteUri }}"
+          json: "{{ patchData }}"
+          headers:
+            Content-Type: "application/json-patch+json"
+            Accept: "application/json-patch+json"
+            X-Referer: "{{ remoteUri }}"
+          afterResponse: "setSaveItemPatch"
+      - patch:
+          url: "{{ remoteUri }}"
+          json: "{{ patchData }}"
+          headers:
+            Content-Type: "application/json-patch+json"
+            Accept: "application/json-patch+json"
+            X-Referer: "{{ remoteUri }}"

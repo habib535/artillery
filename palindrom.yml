@@ -1,0 +1,45 @@
+config:
+  target: "http://localhost:8080/index"
+  processor: "./palindrom.js"
+  phases:
+    - duration: 1
+      arrivalRate: 1
+  palindrom:
+    timeout: 5000
+    onPatchReceived: "logPatchReceived"
+scenarios:
+  - engine: "palindrom"
+    name: "Insert / update / delete N items"
+    weight: 39
+    flow:
+      - loop:
+          #- trigger: "/Playground_0/InsertTrigger$"
+          - updateModelFunction: "insertItem"
+          - updateModelFunction: "emptyTrigger"
+          - function: "saveInsertedItemInfo"
+          - morphUrl: "{{ EditInsertedItemUri }}"
+          - updateModelFunction: "setEditedItemGuid"
+          - updateModelFunction: "setEditedItemIndex"
+          - think: 1
+          - updateModelFunction: "saveEditedItem"
+          - think: 1
+          - morphUrl: "/index"
+          - updateModelFunction: "deleteSavedItem"
+        count: 10
+  - engine: "palindrom"
+    name: "View N items"
+    weight: 59
+    flow:
+      - loop:
+          - function: "saveRundomItemInfo"
+          - morphUrl: "{{ EditRandomItemUri }}"
+          - think: 1
+          - morphUrl: "/index"
+        count: 10
+  - engine: "palindrom"
+    name: "Log current number of items"
+    weight: 2
+    flow:
+      - think: 2
+      - updateModelFunction: "emptyTrigger"
+      - function: "logState"
