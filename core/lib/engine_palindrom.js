@@ -13,6 +13,7 @@ const debugRequests = require('debug')('http:request');
 const engineUtil = require('./engine_util');
 const template = engineUtil.template;
 const Palindrom = require('palindrom');
+var jpath = require('json-path')
 
 module.exports = PalindromEngine;
 
@@ -22,6 +23,8 @@ function PalindromEngine(script) {
 
 PalindromEngine.prototype.createScenario = function (scenarioSpec, ee) {
     var self = this;
+    //console.error("scenarioSpec.engine: "+scenarioSpec.engine)
+    //console.error("scenarioSpec.onPatchReceived: "+scenarioSpec.onPatchReceived)
     let tasks = _.map(scenarioSpec.flow, function (rs) {
         if (rs.think) {
             return engineUtil.createThink(rs, _.get(self.config, 'defaults.think', {}));
@@ -80,48 +83,41 @@ PalindromEngine.prototype.step = function (requestSpec, ee) {
         return function (context, callback) {
             ee.emit("request");
 
-            const originalOnRemoteChange = context.palindrom.onRemoteChange;
-            const timeoutMs = config.timeout || _.get(config, "palindrom.timeout") || 500;
-            const requestTimeout = setTimeout(function () {
-                context.palindrom.onRemoteChange = originalOnRemoteChange;
-
-                const err = "Failed to process request " + requestSpec.updateModelFunction + " within timeout of " + timeoutMs + "ms";
-                ee.emit("error", err);
-                callback(err, context);
-
-                context.palindrom.network._ws.close();
-            }, timeoutMs);
-
-            const startedAt = process.hrtime();
-            const processFunc = self.config.processor[requestSpec.updateModelFunction];
-
-            if (!processFunc) {
-                throw "Function " + requestSpec.updateModelFunction + " not found.";
-            }
-
-            const originalLocalVersion = context.getPalindromLocalVersion();
-
-            context.palindrom.onRemoteChange = function (patches, results) {
-                const newLocalVersion = context.getPalindromLocalVersion();
-
-                if (newLocalVersion <= originalLocalVersion) {
-                    return;
-                }
-
-                clearTimeout(requestTimeout);
-
-                originalOnRemoteChange(patches, results);
-                context.palindrom.onRemoteChange = originalOnRemoteChange;
-
-                const endedAt = process.hrtime(startedAt);
-                const delta = (endedAt[0] * 1e9) + endedAt[1];
-                ee.emit("response", delta, 0, context._uid);
-
-                callback(null, context);
-            };
+            const processFunc = waitForResponse(context, config, requestSpec.updateModelFunction, ee, callback, self);
 
             try {
                 processFunc(context, ee, context.palindrom.obj);
+            } catch (err) {
+                const message = err.message || err.code || err;
+                ee.emit("error", message);
+                callback(message, context);
+            }
+        };
+    }
+
+    if (requestSpec.trigger) {
+        return function (context, callback) {
+            ee.emit("request");
+
+            const processFunc = waitForResponse(context, config, requestSpec.trigger, ee, callback, self);
+
+            let query = requestSpec.trigger;
+
+            console.log(query)
+            try {
+                let queryPart = query.substr(0, query.lastIndexOf("/"));
+                let variablePart = query.substr(query.lastIndexOf("/") + 1);
+
+                let currentViewModel = context.palindrom.obj;
+                console.log(JSON.stringify(currentViewModel))
+
+                let matchingArray = jpath.resolve(currentViewModel, queryPart);
+                if (matchingArray && matchingArray.length > 0) {
+                    matchingArray[0][variablePart]++;
+                }
+                else {
+                    throw "Invalid selector exception: can't find `" + query + "` in Json: " + JSON.stringify(currentViewModel);
+                }
             } catch (err) {
                 const message = err.message || err.code || err;
                 ee.emit("error", message);
@@ -176,13 +172,15 @@ PalindromEngine.prototype.step = function (requestSpec, ee) {
 };
 
 PalindromEngine.prototype.compile = function (tasks, scenarioSpec, ee) {
-    let config = this.config;
+    let self = this;
+    let config = self.config;
 
     return function scenario(initialContext, callback) {
         function zero(callback) {
             const tls = config.tls || {};
             const options = _.extend(tls, config.palindrom);
             const headers = _.get(config, 'palindrom.headers', {});
+            const patchReceivedCallback = config.palindrom.onPatchReceived || _.get(config, "palindrom.onPatchReceived") || _.noop;
 
             ee.emit('started');
 
@@ -233,6 +231,21 @@ PalindromEngine.prototype.compile = function (tasks, scenarioSpec, ee) {
                     },
                     onPatchReceived: function () {
                         debug("Palindrom.onPatchReceived: ", arguments);
+                        if (patchReceivedCallback) {
+                            const processFunc = self.config.processor[patchReceivedCallback];
+
+                            if (!processFunc) {
+                                throw "Function " + patchReceivedCallback + " not found.";
+                            }
+
+                            try {
+                                processFunc(initialContext, arguments);
+                            } catch (err) {
+                                const message = err.message || err.code || err;
+                                ee.emit("error", message);
+                                callback(message, initialContext);
+                            }
+                        }
                     },
                     onConnectionError: function (err) {
                         if (initialContext.palindromConnectionClosed) {
@@ -278,3 +291,37 @@ PalindromEngine.prototype.compile = function (tasks, scenarioSpec, ee) {
         );
     };
 };
+
+function waitForResponse(context, config, action, ee, callback, self) {
+    const originalOnRemoteChange = context.palindrom.onRemoteChange;
+    const timeoutMs = config.timeout || _.get(config, "palindrom.timeout") || 500;
+    const requestTimeout = setTimeout(function () {
+        context.palindrom.onRemoteChange = originalOnRemoteChange;
+        const err = "Failed to process request " + action + " within timeout of " + timeoutMs + "ms";
+        ee.emit("error", err);
+        callback(err, context);
+        context.palindrom.network._ws.close();
+    }, timeoutMs);
+    const startedAt = process.hrtime();
+    const processAction = typeof action === "function" ? self.config.processor[action] : action;
+    if (!processAction) {
+        throw action + " not found.";
+    }
+
+    const originalLocalVersion = context.getPalindromLocalVersion();
+    context.palindrom.onRemoteChange = function (patches, results) {
+        const newLocalVersion = context.getPalindromLocalVersion();
+        if (newLocalVersion <= originalLocalVersion) {
+            return;
+        }
+        clearTimeout(requestTimeout);
+        originalOnRemoteChange(patches, results);
+        context.palindrom.onRemoteChange = originalOnRemoteChange;
+        const endedAt = process.hrtime(startedAt);
+        const delta = (endedAt[0] * 1e9) + endedAt[1];
+        ee.emit("response", delta, 0, context._uid);
+        callback(null, context);
+    };
+    return processAction;
+}
+

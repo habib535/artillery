@@ -11,18 +11,12 @@ module.exports = {
     setEditedItemIndex: setEditedItemIndex,
     saveEditedItem: saveEditedItem,
     deleteSavedItem: deleteSavedItem,
-    saveRundomItemInfo: saveRundomItemInfo,
-    logPatchReceived: logPatchReceived
+    saveRundomItemInfo: saveRundomItemInfo
 };
 
 function logPalindromModel(context, events, done) {
     console.log("Palindrom model: " + JSON.stringify(context.palindrom.obj));
     return done();
-}
-
-function logPatchReceived(context, patch) {
-    console.log('----------------------------------new patch------------------------------------');
-    console.table(context.vars["MyTestVar"]);
 }
 
 function logState(context, events, done) {
@@ -50,7 +44,6 @@ function saveInsertedItemInfo(context, events, done) {
     context.vars["InsertedItemNo"] = obj.Playground_0.InsertedObjectNo;
     context.vars["InsertedItemId"] = item.Id;
     context.vars["EditInsertedItemUri"] = "/items/" + item.Id;
-    context.vars["MyTestVar"] = "A random value: "+Math.random();
 
     return done();
 }

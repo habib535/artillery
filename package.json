@@ -1,5 +1,8 @@
 {
   "scripts": {
     "start": "artillery run palindrom.yml"
+  },
+  "dependencies": {
+    "json-path": "^0.1.3"
   }
 }

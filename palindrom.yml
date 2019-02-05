@@ -13,15 +13,17 @@ scenarios:
     weight: 39
     flow:
       - loop:
-          #- trigger: "/Playground_0/InsertTrigger$"
-          - updateModelFunction: "insertItem"
-          - updateModelFunction: "emptyTrigger"
+          - trigger: "/Playground_0/InsertTrigger$"
+          #- updateModelFunction: "insertItem"
+          - trigger: "/Playground_0/EmptyTrigger$"
+          #- updateModelFunction: "emptyTrigger"
           - function: "saveInsertedItemInfo"
           - morphUrl: "{{ EditInsertedItemUri }}"
           - updateModelFunction: "setEditedItemGuid"
           - updateModelFunction: "setEditedItemIndex"
           - think: 1
-          - updateModelFunction: "saveEditedItem"
+          - trigger: "/Playground_0/SaveTrigger$"
+          # - updateModelFunction: "saveEditedItem"
           - think: 1
           - morphUrl: "/index"
           - updateModelFunction: "deleteSavedItem"
