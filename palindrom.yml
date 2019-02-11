@@ -19,29 +19,13 @@ scenarios:
           #- updateModelFunction: "emptyTrigger"
           - function: "saveInsertedItemInfo"
           - morphUrl: "{{ EditInsertedItemUri }}"
-          - updateModelFunction: "setEditedItemGuid"
+          #- updateModelFunction: "setEditedItemGuid"
+          - update: {"/Playground_0/Item/Guid$" : "{{ Guid }}"}
           - updateModelFunction: "setEditedItemIndex"
           - think: 1
           - trigger: "/Playground_0/SaveTrigger$"
-          # - updateModelFunction: "saveEditedItem"
+          #- updateModelFunction: "saveEditedItem"
           - think: 1
           - morphUrl: "/index"
-          - updateModelFunction: "deleteSavedItem"
-        count: 10
-  - engine: "palindrom"
-    name: "View N items"
-    weight: 59
-    flow:
-      - loop:
-          - function: "saveRundomItemInfo"
-          - morphUrl: "{{ EditRandomItemUri }}"
-          - think: 1
-          - morphUrl: "/index"
-        count: 10
-  - engine: "palindrom"
-    name: "Log current number of items"
-    weight: 2
-    flow:
-      - think: 2
-      - updateModelFunction: "emptyTrigger"
-      - function: "logState"
+          #- updateModelFunction: "deleteSavedItem"
+        count: 1

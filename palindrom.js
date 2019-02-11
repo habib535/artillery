@@ -45,6 +45,8 @@ function saveInsertedItemInfo(context, events, done) {
     context.vars["InsertedItemId"] = item.Id;
     context.vars["EditInsertedItemUri"] = "/items/" + item.Id;
 
+    context.vars["Guid"] = "Aritllery.io - " + new Date().toString();
+
     return done();
 }
 
